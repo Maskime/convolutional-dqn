@@ -148,14 +148,14 @@ if os.path.exists(latest_path):
 os.symlink(videos_path, latest_path)
 
 cnn = CNN(env.action_space.n)
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# print(device)
-# cnn.to(device)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+cnn.to(device)
 body = SoftmaxBody(1.0)
 ai = AI(cnn, body)
 
-n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
-memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=10000)
+n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10, device=device)
+memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=10000, device=device)
 
 ma = MA(100)
 
