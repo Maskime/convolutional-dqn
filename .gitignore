@@ -108,3 +108,4 @@ venv.bak/
 *.json
 **/**/*.mp4
 .idea/
+videos/latest

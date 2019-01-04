@@ -10,7 +10,8 @@ import torch.optim as optim
 from gym import wrappers
 from torch.autograd import Variable
 
-import experience_replay, image_preprocessing
+import experience_replay
+import image_preprocessing
 
 
 # ACTION_MEANING = {
@@ -95,7 +96,6 @@ class MA:
         self.size = size
 
     def add(self, cumul_reward):
-        print(cumul_reward)
         if isinstance(cumul_reward, list):
             self.list_of_rewards += cumul_reward
         else:
@@ -111,7 +111,6 @@ def eligibility_trace(batch, cnn):
     gamma = 0.99
     inputs = []
     targets = []
-    print('batch len', len(batch))
     for series in batch:
         if len(series) == 0:
             continue
@@ -120,7 +119,6 @@ def eligibility_trace(batch, cnn):
         cumul_reward = 0.0 if series[-1].done else output[1].data.max()
         for step in reversed(series[:-1]):
             cumul_reward = step.reward + cumul_reward * gamma
-        print('cumul_reward', cumul_reward)
         state = series[0].state
         target = output[0].data
         target[series[0].action] = cumul_reward
@@ -130,62 +128,54 @@ def eligibility_trace(batch, cnn):
 
 
 def video_callable(episode_id):
-    print('Episode ID', episode_id)
     return True
 
 
 env = gym.make('Alien-v0')
-print(env.action_space)
-print(env.observation_space)
 
 env = image_preprocessing.PreprocessImage(env, 80, 80, True)
-env = wrappers.Monitor(env, '/home/maxoumask/dev/convolutional-dqn/videos/' + str(time.time()) + '/',
-                       video_callable=video_callable)
-print(env.action_space.n)
+videos_dir = str(time.time())
+root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
+latest_path = os.path.join(root_dir, 'latest')
+videos_path = os.path.realpath(os.path.join(root_dir, videos_dir))
+
+print(root_dir, latest_path, videos_path)
+
+env = wrappers.Monitor(env, videos_path, video_callable=video_callable)
+
+if os.path.exists(latest_path):
+    os.unlink(latest_path)
+os.symlink(videos_path, latest_path)
 
 cnn = CNN(env.action_space.n)
 body = SoftmaxBody(1.0)
 ai = AI(cnn, body)
 
 n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
-memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=1000)
+memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=10000)
 
 ma = MA(100)
 
 loss = nn.MSELoss()
 optimizer = optim.Adam(cnn.parameters(), lr=0.001)
-nb_epochs = 20
+nb_epochs = 40
 
-print('Starting learning')
-
+surround_1 = '-' * 28
+surround_2 = '=' * 28
 for epoch in range(1, nb_epochs + 1):
-    print('----------------------------Starting epoch {}----------------------------'.format(epoch))
-    memory.run_steps(250)
-    print('Run steps done')
+    print('{}Starting epoch {}{}'.format(surround_1, epoch, surround_1))
+    memory.run_steps(900)
     for batch in memory.sample_batch(128):
-        print('Treating batch - eligibility trance')
         inputs, targets = eligibility_trace(batch, cnn)
-        print('Treating batch - Converting to variable')
         inputs, targets = Variable(inputs), Variable(targets)
-        print('Treating batch - Making predictions', end=' ')
         predictions = cnn(inputs)
-        print(predictions)
-        print('Treating batch - Calculating loss', end=' ')
         loss_error = loss(predictions, targets)
-        print(loss_error)
-        print('Treating batch - Optimizer reset')
         optimizer.zero_grad()
-        print('Treating batch - Backpropagation', end=' ')
         loss_error.backward()
-        print('done')
-        print('Treating batch - Updating weights', end=' ')
         optimizer.step()
-        print('done')
     reward_steps = n_steps.rewards_steps()
     ma.add(reward_steps)
     avg_reward = ma.average()
-    print('============================Epoch: {}, Average reward: {}============================'.format(str(epoch),
-                                                                                                         str(
-                                                                                                             avg_reward)))
+    print('{}Epoch: {}, Average reward: {}{}'.format(surround_2, str(epoch), str(avg_reward), surround_2))
 
 env.close()
