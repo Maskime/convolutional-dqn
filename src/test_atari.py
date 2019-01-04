@@ -113,6 +113,8 @@ def eligibility_trace(batch, cnn):
     targets = []
     print('batch len', len(batch))
     for series in batch:
+        if len(series) == 0:
+            continue
         input = Variable(torch.from_numpy(np.array([series[0].state, series[-1].state], dtype=np.float32)))
         output = cnn(input)
         cumul_reward = 0.0 if series[-1].done else output[1].data.max()
@@ -126,16 +128,19 @@ def eligibility_trace(batch, cnn):
         targets.append(target)
     return torch.from_numpy(np.array(inputs, dtype=np.float32)), torch.stack(targets)
 
+
 def video_callable(episode_id):
     print('Episode ID', episode_id)
     return True
+
 
 env = gym.make('Alien-v0')
 print(env.action_space)
 print(env.observation_space)
 
 env = image_preprocessing.PreprocessImage(env, 80, 80, True)
-env = wrappers.Monitor(env, '/home/maxoumask/dev/convolutional-dqn/videos/' + str(time.time()) + '/', video_callable=video_callable)
+env = wrappers.Monitor(env, '/home/maxoumask/dev/convolutional-dqn/videos/' + str(time.time()) + '/',
+                       video_callable=video_callable)
 print(env.action_space.n)
 
 cnn = CNN(env.action_space.n)
@@ -179,6 +184,8 @@ for epoch in range(1, nb_epochs + 1):
     reward_steps = n_steps.rewards_steps()
     ma.add(reward_steps)
     avg_reward = ma.average()
-    print('============================Epoch: {}, Average reward: {}============================'.format(str(epoch), str(avg_reward)))
+    print('============================Epoch: {}, Average reward: {}============================'.format(str(epoch),
+                                                                                                         str(
+                                                                                                             avg_reward)))
 
 env.close()
