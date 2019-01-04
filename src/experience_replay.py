@@ -41,7 +41,6 @@ class NStepProgress:
                 penalty = -(penalty_base * (1 + penalty_rate * int(nb_cons_zero / 5)))
                 reward += penalty
                 r = penalty
-                print('Applying penalty', penalty)
 
             history.append(Step(state=state, action=action, reward=r, done=is_done))
             while len(history) > self.n_step + 1:
