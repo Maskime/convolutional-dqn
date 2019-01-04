@@ -148,9 +148,6 @@ if os.path.exists(latest_path):
 os.symlink(videos_path, latest_path)
 
 cnn = CNN(env.action_space.n)
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# print(device)
-# cnn.to(device)
 body = SoftmaxBody(1.0)
 ai = AI(cnn, body)
 

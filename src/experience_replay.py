@@ -22,10 +22,27 @@ class NStepProgress:
         state = self.env.reset()
         history = deque()
         reward = 0.0
+        nb_cons_zero = 0
+        penalty_rate = 10
+        penalty_base = 0.1
+        previous_r = None
         while True:
             action = self.ai(np.array([state]))[0][0]
             next_state, r, is_done, _ = self.env.step(action)
             reward += r
+            if previous_r is None:
+                previous_r = r
+            elif r == 0 and previous_r == 0:
+                nb_cons_zero += 1
+            else:
+                previous_r = r
+                nb_cons_zero = 0
+            if nb_cons_zero % 5 == 0:
+                penalty = -(penalty_base * (1 + penalty_rate * int(nb_cons_zero / 5)))
+                reward += penalty
+                r = penalty
+                print('Applying penalty', penalty)
+
             history.append(Step(state=state, action=action, reward=r, done=is_done))
             while len(history) > self.n_step + 1:
                 history.popleft()
