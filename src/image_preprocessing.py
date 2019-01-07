@@ -27,7 +27,6 @@ class PreprocessImage(ObservationWrapper):
         border = np.array([80, 0, 132])
         img = self.crop(img)
         img = np.where(np.logical_and(img != background, img != border), [254, 254, 254], img)
-        imsave('colored.png', img)
         img = imresize(img, self.img_size)
         if self.grayscale:
             img = img.mean(-1, keepdims=True)
