@@ -26,12 +26,9 @@ class PreprocessImage(ObservationWrapper):
         # 80 0 132
         border = np.array([80, 0, 132])
         img = self.crop(img)
+        img = np.where(np.logical_and(img != background, img != border), [254, 254, 254], img)
+        imsave('colored.png', img)
         img = imresize(img, self.img_size)
-        for line_index, line in enumerate(img):
-            for pixel_index, pixel in enumerate(line):
-                if not np.array_equal(pixel, background) and not np.array_equal(pixel, border):
-                    img[line_index][pixel_index] = [254, 254, 254]
-        imsave('resized.png', img)
         if self.grayscale:
             img = img.mean(-1, keepdims=True)
         img = np.transpose(img, (2, 0, 1))
