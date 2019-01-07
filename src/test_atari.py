@@ -157,7 +157,7 @@ cnn = CNN(env.action_space.n)
 body = SoftmaxBody(1.0)
 ai = AI(cnn, body)
 
-n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
+n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=50)
 memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=10000)
 
 ma = MA(100)
