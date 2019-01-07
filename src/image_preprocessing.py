@@ -5,7 +5,7 @@ import numpy as np
 from gym.core import ObservationWrapper
 from gym.spaces.box import Box
 from gym.wrappers import TimeLimit
-from scipy.misc import imresize
+from scipy.misc import imresize, imsave
 
 
 # Preprocessing the Images
@@ -22,6 +22,7 @@ class PreprocessImage(ObservationWrapper):
 
     def observation(self, img):
         img = self.crop(img)
+        # imsave('cropped.png', img)
         img = imresize(img, self.img_size)
         if self.grayscale:
             img = img.mean(-1, keepdims=True)

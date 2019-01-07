@@ -131,9 +131,18 @@ def video_callable(episode_id):
     return True
 
 
+img_shape = None
+
+
+def crop_image(img: np.ndarray):
+    img_shape = img.shape
+    cropped = img[5:img_shape[0] - 17, 16:img_shape[1] - 16]
+    return cropped
+
+
 env = gym.make('Alien-v0')
 
-env = image_preprocessing.PreprocessImage(env, 80, 80, True)
+env = image_preprocessing.PreprocessImage(env, 80, 80, True, crop_image)
 videos_dir = str(time.time())
 root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
 latest_path = os.path.join(root_dir, 'latest')
