@@ -23,8 +23,8 @@ class NStepProgress:
         history = deque()
         reward = 0.0
         nb_cons_zero = 0
-        penalty_rate = 10
-        penalty_base = 0.1
+        penalty = -10
+        consecutive_zero = 5
         previous_r = None
         while True:
             action = self.ai(np.array([state]))[0][0]
@@ -37,8 +37,7 @@ class NStepProgress:
             else:
                 previous_r = r
                 nb_cons_zero = 0
-            if nb_cons_zero % 5 == 0:
-                penalty = -(penalty_base * (1 + penalty_rate * int(nb_cons_zero / 5)))
+            if nb_cons_zero % consecutive_zero == 0:
                 reward += penalty
                 r = penalty
 
