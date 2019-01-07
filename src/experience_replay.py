@@ -25,6 +25,8 @@ class NStepProgress:
         while True:
             action = self.ai(np.array([state]))[0][0]
             next_state, r, is_done, _ = self.env.step(action)
+            if r == 0:
+                r = -1
             reward += r
 
             history.append(Step(state=state, action=action, reward=r, done=is_done))
