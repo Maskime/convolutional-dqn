@@ -23,7 +23,7 @@ class PreprocessImage(ObservationWrapper):
     def observation(self, img):
         img = self.crop(img)
         # imsave('cropped.png', img)
-        img = imresize(img, self.img_size)
+        # img = imresize(img, self.img_size)
         if self.grayscale:
             img = img.mean(-1, keepdims=True)
         img = np.transpose(img, (2, 0, 1))
