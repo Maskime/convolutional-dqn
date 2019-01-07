@@ -21,8 +21,16 @@ class PreprocessImage(ObservationWrapper):
         self.observation_space = Box(0.0, 1.0, [n_colors, height, width], dtype=np.float32)
 
     def observation(self, img):
+        # 45 50 184
+        background = np.array([45, 50, 184])
+        # 80 0 132
+        border = np.array([80, 0, 132])
         img = self.crop(img)
-        # imsave('cropped.png', img)
+        for line_index, line in enumerate(img):
+            for pixel_index, pixel in enumerate(line):
+                if not np.array_equal(pixel, background) and not np.array_equal(pixel, border):
+                    img[line_index][pixel_index] = [254, 254, 254]
+        imsave('cropped.png', img)
         img = imresize(img, self.img_size)
         if self.grayscale:
             img = img.mean(-1, keepdims=True)
