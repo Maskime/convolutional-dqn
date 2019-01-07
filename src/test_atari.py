@@ -131,9 +131,6 @@ def video_callable(episode_id):
     return True
 
 
-img_shape = None
-
-
 def crop_image(img: np.ndarray):
     img_shape = img.shape
     cropped = img[5:img_shape[0] - 17, 16:img_shape[1] - 16]
@@ -157,15 +154,11 @@ if os.path.exists(latest_path):
 os.symlink(videos_path, latest_path)
 
 cnn = CNN(env.action_space.n)
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
-cnn.to(device)
-
 body = SoftmaxBody(1.0)
 ai = AI(cnn, body)
 
-n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10, device=device)
-memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=10000, device=device)
+n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
+memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=10000)
 
 ma = MA(100)
 
