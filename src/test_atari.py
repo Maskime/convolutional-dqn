@@ -1,5 +1,9 @@
+import datetime
+import logging
 import os
+import sys
 import time
+from typing import Optional
 
 import gym
 import numpy as np
@@ -10,9 +14,9 @@ import torch.optim as optim
 from gym import wrappers
 from torch.autograd import Variable
 
+import cdqn_logging
 import experience_replay
 import image_preprocessing
-
 
 # ACTION_MEANING = {
 #     0 : "NOOP",
@@ -34,6 +38,7 @@ import image_preprocessing
 #     16 : "DOWNRIGHTFIRE",
 #     17 : "DOWNLEFTFIRE",
 # }
+from cdqn_logging import logger
 
 
 class CNN(nn.Module):
@@ -137,15 +142,26 @@ def crop_image(img: np.ndarray):
     return cropped
 
 
-env = gym.make('Alien-v0')
+def get_filehandler(file_dir):
+    formatter = logging.Formatter(cdqn_logging.cdqn_logformat)
+    file_handler = logging.FileHandler(os.path.join(file_dir, 'activity.log'), 'a')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    return file_handler
 
-env = image_preprocessing.PreprocessImage(env, 80, 80, True, crop_image)
+
 videos_dir = str(time.time())
 root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
 latest_path = os.path.join(root_dir, 'latest')
 videos_path = os.path.realpath(os.path.join(root_dir, videos_dir))
+os.mkdir(videos_path, 0o775)
+logger.addHandler(get_filehandler(videos_path))
 
-print(root_dir, latest_path, videos_path)
+logger.info('Loading env')
+env = gym.make('Alien-v0')
+logger.info('env loaded')
+
+env = image_preprocessing.PreprocessImage(env, 80, 80, True, crop_image)
 
 env = wrappers.Monitor(env, videos_path, video_callable=video_callable)
 
@@ -166,12 +182,17 @@ loss = nn.MSELoss()
 optimizer = optim.Adam(cnn.parameters(), lr=0.001)
 nb_epochs = 40
 
-surround_1 = '-' * 28
-surround_2 = '=' * 28
 for epoch in range(1, nb_epochs + 1):
-    print('{}Starting epoch {}{}'.format(surround_1, epoch, surround_1))
+    epoch_start = datetime.datetime.now()
+    logger.info('Starting epoch {}'.format(epoch))
+    logger.info('Running steps')
+    start = datetime.datetime.now()
     memory.run_steps(900)
-    for batch in memory.sample_batch(128):
+    end = datetime.datetime.now()
+    logger.info('Steps done in : {}s'.format((end - start).total_seconds()))
+    for idx, batch in enumerate(memory.sample_batch(128)):
+        start = datetime.datetime.now()
+        logger.info('Start batch {}'.format(idx + 1))
         inputs, targets = eligibility_trace(batch, cnn)
         inputs, targets = Variable(inputs), Variable(targets)
         predictions = cnn(inputs)
@@ -179,9 +200,12 @@ for epoch in range(1, nb_epochs + 1):
         optimizer.zero_grad()
         loss_error.backward()
         optimizer.step()
+        end = datetime.datetime.now()
+        logger.info('Batch {} done in : {}s'.format(idx + 1, (end - start).total_seconds()))
     reward_steps = n_steps.rewards_steps()
     ma.add(reward_steps)
     avg_reward = ma.average()
-    print('{}Epoch: {}, Average reward: {}{}'.format(surround_2, str(epoch), str(avg_reward), surround_2))
+    epoch_end = datetime.datetime.now()
+    logger.info('Epoch: {}, Average reward: {}, in {}s'.format(epoch, avg_reward, (epoch_end - epoch_start).total_seconds()))
 
 env.close()
