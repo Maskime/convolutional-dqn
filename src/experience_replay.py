@@ -27,21 +27,20 @@ class NStepProgress:
             next_state, r, is_done, _ = self.env.step(action)
             reward += r
             history.append(Step(state=state, action=action, reward=r, done=is_done))
-            while len(history) > self.n_step + 1:
-                history.popleft()
-            if len(history) == self.n_step + 1:
-                yield tuple(history)
+            if (len(history) % self.n_step) == 0:
+                # yield tuple(history)
+                self.rewards.append(reward)
+                print('Last reward sum (' + str(len(history)) + ')', reward)
+                reward = 0.
+                # history.clear()
             state = next_state
             if is_done:
-                if len(history) > self.n_step + 1:
-                    history.popleft()
-                while len(history) >= 1:
-                    yield tuple(history)
-                    history.popleft()
-                self.rewards.append(reward)
-                reward = 0.0
-                state = self.env.reset()
+                if (len(history) % self.n_step) != 0:
+                    self.rewards.append(reward)
+                    print('Last reward sum (' + str(len(history)) + ')', reward)
+                yield tuple(history)
                 history.clear()
+                state = self.env.reset()
 
     def rewards_steps(self):
         rewards_steps = self.rewards
@@ -68,10 +67,11 @@ class ReplayMemory:
             yield vals[ofs * batch_size:(ofs + 1) * batch_size]
             ofs += 1
 
-    def run_steps(self, samples):
+    def run_games(self, samples):
         # for entry in self.n_steps_iter:
         while samples > 0:
             entry = next(self.n_steps_iter)  # 10 consecutive steps
+            print('History len', len(entry))
             self.buffer.append(entry)  # we put 200 for the current episode
             samples -= 1
         while len(self.buffer) > self.capacity:  # we accumulate no more than the capacity (10000)

@@ -140,7 +140,7 @@ loss = nn.MSELoss()
 optimizer = optim.Adam(cnn.parameters(), lr=0.001)
 nb_epochs = 100
 for epoch in range(1, nb_epochs + 1):
-    memory.run_steps(200)
+    memory.run_games(200)
     for batch in memory.sample_batch(128):
         inputs, targets = eligibility_trace(batch)
         inputs, targets = Variable(inputs), Variable(targets)

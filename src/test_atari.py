@@ -185,11 +185,11 @@ nb_epochs = 40
 for epoch in range(1, nb_epochs + 1):
     epoch_start = datetime.datetime.now()
     logger.info('Starting epoch {}'.format(epoch))
-    logger.info('Running steps')
+    logger.info('Running games')
     start = datetime.datetime.now()
-    memory.run_steps(512)
+    memory.run_games(3)
     end = datetime.datetime.now()
-    logger.info('Steps done in : {}s'.format((end - start).total_seconds()))
+    logger.info('Games done in : {}s'.format((end - start).total_seconds()))
     for batch in memory.sample_batch(128):
         start = datetime.datetime.now()
         inputs, targets = eligibility_trace(batch, cnn)
