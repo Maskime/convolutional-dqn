@@ -23,10 +23,17 @@ class NStepProgress:
         history = deque()
         reward = 0.0
         while True:
+            # We need to take an action every 3 frames because of all the blinkiness of the game.
+            # Since the state is composed only of the current observation
+            # We accumulate 3 frames then pass it to the CNN
+            accumulated_state = np.empty_like(state)
+            for i in range(0, 3):
+                # 0 is the NOOP action
+                next_state, r, is_done, _ = self.env.step(0)
+                np.add(next_state, accumulated_state, out=accumulated_state)
+            state = accumulated_state
             action = self.ai(np.array([state]))[0][0]
             next_state, r, is_done, _ = self.env.step(action)
-            # if r == 0:
-            #     r = -1
             reward += r
 
             history.append(Step(state=state, action=action, reward=r, done=is_done))
