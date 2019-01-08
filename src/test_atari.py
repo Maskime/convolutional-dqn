@@ -170,7 +170,7 @@ if os.path.exists(latest_path):
 os.symlink(videos_path, latest_path)
 
 cnn = CNN(env.action_space.n)
-body = SoftmaxBody(1.0)
+body = SoftmaxBody(0.5)
 ai = AI(cnn, body)
 
 n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=50)
@@ -187,12 +187,11 @@ for epoch in range(1, nb_epochs + 1):
     logger.info('Starting epoch {}'.format(epoch))
     logger.info('Running steps')
     start = datetime.datetime.now()
-    memory.run_steps(900)
+    memory.run_steps(512)
     end = datetime.datetime.now()
     logger.info('Steps done in : {}s'.format((end - start).total_seconds()))
-    for idx, batch in enumerate(memory.sample_batch(128)):
+    for batch in memory.sample_batch(128):
         start = datetime.datetime.now()
-        logger.info('Start batch {}'.format(idx + 1))
         inputs, targets = eligibility_trace(batch, cnn)
         inputs, targets = Variable(inputs), Variable(targets)
         predictions = cnn(inputs)
@@ -201,7 +200,6 @@ for epoch in range(1, nb_epochs + 1):
         loss_error.backward()
         optimizer.step()
         end = datetime.datetime.now()
-        logger.info('Batch {} done in : {}s'.format(idx + 1, (end - start).total_seconds()))
     reward_steps = n_steps.rewards_steps()
     ma.add(reward_steps)
     avg_reward = ma.average()
