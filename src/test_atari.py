@@ -1,23 +1,21 @@
+import warnings
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 import datetime
 import logging
 import os
-import sys
 import time
-from typing import Optional
 
+import cdqn_logging
+import experience_replay
 import gym
+import image_preprocessing
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from gym import wrappers
-from torch.autograd import Variable
-
-import cdqn_logging
-import experience_replay
-import image_preprocessing
-
 # ACTION_MEANING = {
 #     0 : "NOOP",
 #     1 : "FIRE",
@@ -39,6 +37,8 @@ import image_preprocessing
 #     17 : "DOWNLEFTFIRE",
 # }
 from cdqn_logging import logger
+from gym import wrappers
+from torch.autograd import Variable
 
 
 class CNN(nn.Module):
@@ -173,14 +173,14 @@ cnn = CNN(env.action_space.n)
 body = SoftmaxBody(0.5)
 ai = AI(cnn, body)
 
-n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=50)
-memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=10000)
+n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
+memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=1000, logger=logger)
 
 ma = MA(100)
 
 loss = nn.MSELoss()
 optimizer = optim.Adam(cnn.parameters(), lr=0.001)
-nb_epochs = 40
+nb_epochs = 50
 
 for epoch in range(1, nb_epochs + 1):
     epoch_start = datetime.datetime.now()
@@ -189,8 +189,12 @@ for epoch in range(1, nb_epochs + 1):
     start = datetime.datetime.now()
     memory.run_games(3)
     end = datetime.datetime.now()
-    logger.info('Games done in : {}s'.format((end - start).total_seconds()))
-    for batch in memory.sample_batch(128):
+    reward_steps = n_steps.rewards_steps()
+    ma.add(reward_steps)
+    logger.info(
+        'Games done in : {}s, avg score {}, min {}, max {}'.format((end - start).total_seconds(), np.mean(reward_steps),
+                                                                   np.min(reward_steps), np.max(reward_steps)))
+    for idx, batch in enumerate(memory.sample_batch(128)):
         start = datetime.datetime.now()
         inputs, targets = eligibility_trace(batch, cnn)
         inputs, targets = Variable(inputs), Variable(targets)
@@ -200,10 +204,11 @@ for epoch in range(1, nb_epochs + 1):
         loss_error.backward()
         optimizer.step()
         end = datetime.datetime.now()
-    reward_steps = n_steps.rewards_steps()
-    ma.add(reward_steps)
+        logger.info('Batch {} done'.format(idx))
+
     avg_reward = ma.average()
     epoch_end = datetime.datetime.now()
-    logger.info('Epoch: {}, Average reward: {}, in {}s'.format(epoch, avg_reward, (epoch_end - epoch_start).total_seconds()))
+    logger.info(
+        'Epoch: {}, Average reward: {}, in {}s'.format(epoch, avg_reward, (epoch_end - epoch_start).total_seconds()))
 
 env.close()

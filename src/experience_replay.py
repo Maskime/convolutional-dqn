@@ -17,30 +17,29 @@ class NStepProgress:
         self.rewards = []
         self.env = env
         self.n_step = n_step
+        self.game_rewards = []
 
     def __iter__(self):
         state = self.env.reset()
-        history = deque()
+        history = deque(maxlen=self.n_step)
         reward = 0.0
-        while True:
+        is_done = False
+        while not is_done:
             action = self.ai(np.array([state]))[0][0]
             next_state, r, is_done, _ = self.env.step(action)
             reward += r
             history.append(Step(state=state, action=action, reward=r, done=is_done))
             if (len(history) % self.n_step) == 0:
-                # yield tuple(history)
-                self.rewards.append(reward)
-                print('Last reward sum (' + str(len(history)) + ')', reward)
-                reward = 0.
-                # history.clear()
-            state = next_state
-            if is_done:
-                if (len(history) % self.n_step) != 0:
-                    self.rewards.append(reward)
-                    print('Last reward sum (' + str(len(history)) + ')', reward)
+                self.game_rewards.append(reward)
                 yield tuple(history)
+                reward = 0.
                 history.clear()
-                state = self.env.reset()
+            state = next_state
+        if (len(history) > 0) and (len(history) % self.n_step) != 0:
+            self.game_rewards.append(reward)
+            self.rewards.append(np.sum(self.game_rewards))
+            self.game_rewards.clear()
+            yield tuple(history)
 
     def rewards_steps(self):
         rewards_steps = self.rewards
@@ -52,11 +51,11 @@ class NStepProgress:
 
 class ReplayMemory:
 
-    def __init__(self, n_steps, capacity=10000):
+    def __init__(self, n_steps, logger, capacity=10000):
         self.capacity = capacity
         self.n_steps = n_steps
-        self.n_steps_iter = iter(n_steps)
-        self.buffer = deque()
+        self.buffer = deque(maxlen=capacity)
+        self.logger = logger
 
     def sample_batch(self, batch_size):  # creates an iterator that returns random batches
         ofs = 0
@@ -67,12 +66,14 @@ class ReplayMemory:
             yield vals[ofs * batch_size:(ofs + 1) * batch_size]
             ofs += 1
 
-    def run_games(self, samples):
+    def run_games(self, nb_games):
         # for entry in self.n_steps_iter:
-        while samples > 0:
-            entry = next(self.n_steps_iter)  # 10 consecutive steps
-            print('History len', len(entry))
-            self.buffer.append(entry)  # we put 200 for the current episode
-            samples -= 1
-        while len(self.buffer) > self.capacity:  # we accumulate no more than the capacity (10000)
-            self.buffer.popleft()
+        game_number = 1
+        while nb_games > 0:
+            self.logger.debug('Starting Game {}'.format(game_number))
+            game_generator = iter(self.n_steps)
+            for entry in game_generator:
+                self.buffer.append(entry)  # we put 200 for the current episode
+            self.logger.debug('Game {} done'.format(game_number))
+            game_number += 1
+            nb_games -= 1
