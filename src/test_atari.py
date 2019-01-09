@@ -1,4 +1,5 @@
 import warnings
+from collections import deque, namedtuple
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -97,7 +98,7 @@ class MA:
 
     def __init__(self, size) -> None:
         super().__init__()
-        self.list_of_rewards = []
+        self.list_of_rewards = deque(maxlen=size)
         self.size = size
 
     def add(self, cumul_reward):
@@ -105,11 +106,15 @@ class MA:
             self.list_of_rewards += cumul_reward
         else:
             self.list_of_rewards.append(cumul_reward)
-        while len(self.list_of_rewards) > self.size:
-            del self.list_of_rewards[0]
 
     def average(self):
         return np.mean(self.list_of_rewards)
+
+    def min(self):
+        return np.min(self.list_of_rewards)
+
+    def max(self):
+        return np.max(self.list_of_rewards)
 
 
 def eligibility_trace(batch, cnn, device):
@@ -150,6 +155,28 @@ def get_filehandler(file_dir):
     return file_handler
 
 
+Config = namedtuple('Config', ['nb_epoch',
+                               'with_crop',
+                               'with_color_pre',
+                               'image_size',
+                               'nb_games',
+                               'softmax_temp',
+                               'n_step',
+                               'memory_capacity',
+                               'optimizer_lr'])
+
+config = Config(
+    nb_epoch=20,
+    with_crop=True,
+    with_color_pre=True,
+    image_size={'w': 80, 'h': 80},
+    nb_games=2,
+    softmax_temp=0.5,
+    n_step=10,
+    memory_capacity=1000,
+    optimizer_lr=0.001
+)
+
 videos_dir = str(time.time())
 root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
 latest_path = os.path.join(root_dir, 'latest')
@@ -165,7 +192,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 logger.info("I will use the device {}".format(device))
 
-env = image_preprocessing.PreprocessImage(env, 80, 80, True, crop_image)
+env = image_preprocessing.PreprocessImage(env, config.image_size['w'], config.image_size['h'], True, crop_image)
 
 env = wrappers.Monitor(env, videos_path, video_callable=video_callable)
 
@@ -175,25 +202,26 @@ os.symlink(videos_path, latest_path)
 
 cnn = CNN(env.action_space.n)
 cnn.to(device)
-body = SoftmaxBody(0.5)
+body = SoftmaxBody(config.softmax_temp)
 body.to(device)
 ai = AI(brain=cnn, body=body, device=device)
 
-n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
-memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=5000, logger=logger)
+n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=config.n_step)
+memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=config.memory_capacity, logger=logger)
 
-ma = MA(100)
+ma = MA(config.nb_epoch * config.nb_games)
 
 loss = nn.MSELoss()
-optimizer = optim.Adam(cnn.parameters(), lr=0.001)
-nb_epochs = 50
+optimizer = optim.Adam(cnn.parameters(), lr=config.optimizer_lr)
+nb_epochs = config.nb_epoch
+total_chrono = datetime.datetime.now()
 
 for epoch in range(1, nb_epochs + 1):
     epoch_start = datetime.datetime.now()
     logger.info('Starting epoch {}'.format(epoch))
     logger.info('Running games')
     start = datetime.datetime.now()
-    memory.run_games(3)
+    memory.run_games(config.nb_games)
     end = datetime.datetime.now()
     reward_steps = n_steps.rewards_steps()
     ma.add(reward_steps)
@@ -201,18 +229,16 @@ for epoch in range(1, nb_epochs + 1):
         'Games done in : {}s, avg score {}, min {}, max {}'.format((end - start).total_seconds(), np.mean(reward_steps),
                                                                    np.min(reward_steps), np.max(reward_steps)))
     for idx, batch in enumerate(memory.sample_batch(128)):
-        start = datetime.datetime.now()
         inputs, targets = eligibility_trace(batch, cnn, device)
         predictions = cnn(inputs.to(device))
         loss_error = loss(predictions.to(device), targets.to(device))
         optimizer.zero_grad()
         loss_error.backward()
         optimizer.step()
-        end = datetime.datetime.now()
 
     avg_reward = ma.average()
     epoch_end = datetime.datetime.now()
-    logger.info(
-        'Epoch: {}, Average reward: {}, in {}s'.format(epoch, avg_reward, (epoch_end - epoch_start).total_seconds()))
-
+    logger.info('Epoch: {}, Average reward: {}'.format(epoch, avg_reward))
+total_end = datetime.datetime.now()
+logger.info('{}\t{}\t{}\t{}'.format(ma.average(), ma.min(), ma.max(), (total_end - total_chrono).total_seconds()))
 env.close()
