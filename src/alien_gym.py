@@ -126,7 +126,7 @@ Config = namedtuple('Config', ['nb_epoch',
                                'memory_capacity',
                                'optimizer_lr'])
 
-AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time'])
+AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time', 'videos_dir'])
 
 
 class AlienGym:
@@ -230,4 +230,4 @@ class AlienGym:
             '{}\t{}\t{}\t{}'.format(ma.average(), ma.min(), ma.max(), total_seconds))
         env.close()
         return AlienGymResult(config=config, final_mean=ma.average(), min=ma.min(), max=ma.max(),
-                              total_time=total_seconds)
+                              total_time=total_seconds, videos_dir=videos_dir)
