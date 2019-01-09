@@ -1,4 +1,5 @@
 from alien_gym import Config, AlienGym
+from cdqn_logging import cdqn_logger
 
 nb_runs = 3  # number of runs for each configuration
 
@@ -17,6 +18,7 @@ configs = [Config(
 alien_gym = AlienGym()
 run_number = 0
 for config in configs:
+    cdqn_logger.info('---------Starting run {}---------'.format(run_number))
     for i in range(0, nb_runs):
         result = alien_gym.run(config=config, run_number=run_number)
         print(result)
