@@ -180,7 +180,7 @@ body.to(device)
 ai = AI(brain=cnn, body=body, device=device)
 
 n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
-memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=1000, logger=logger)
+memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=5000, logger=logger)
 
 ma = MA(100)
 
