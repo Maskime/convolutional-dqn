@@ -6,28 +6,68 @@ from cdqn_logging import cdqn_logger
 
 nb_runs = 3  # number of runs for each configuration
 
-configs = [Config(
-    nb_epoch=1,
-    with_crop=True,
-    with_color_pre=True,
-    image_size='80x80',
-    nb_games=3,
-    softmax_temp=0.5,
-    n_step=10,
-    memory_capacity=1000,
-    optimizer_lr=0.001
-),
+configs = [
     Config(
-        nb_epoch=1,
-        with_crop=True,
-        with_color_pre=True,
-        image_size='80x80',
-        nb_games=3,
-        softmax_temp=0.5,
-        n_step=15,
-        memory_capacity=1000,
-        optimizer_lr=0.001
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
+        memory_capacity=1000, optimizer_lr=0.001,
+        n_step=10
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
+        memory_capacity=1000, optimizer_lr=0.001,
+        n_step=20
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
+        memory_capacity=1000, optimizer_lr=0.001,
+        n_step=40
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
+        memory_capacity=1000, optimizer_lr=0.001,
+        n_step=80
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
+        n_step=10, optimizer_lr=0.001,
+        memory_capacity=2000
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
+        n_step=10, optimizer_lr=0.001,
+        memory_capacity=4000
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
+        n_step=10, optimizer_lr=0.001,
+        memory_capacity=8000
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
+        n_step=10, optimizer_lr=0.001,
+        softmax_temp=0.1
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
+        n_step=10, optimizer_lr=0.001,
+        softmax_temp=0.2
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
+        n_step=10, optimizer_lr=0.001,
+        softmax_temp=0.4
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
+        n_step=10, optimizer_lr=0.001,
+        softmax_temp=0.8
+    ),
+    Config(
+        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
+        n_step=10, optimizer_lr=0.001,
+        softmax_temp=1.6
     )
+
 ]
 
 alien_gym = AlienGym()
