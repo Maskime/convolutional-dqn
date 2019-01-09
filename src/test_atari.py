@@ -209,7 +209,6 @@ for epoch in range(1, nb_epochs + 1):
         loss_error.backward()
         optimizer.step()
         end = datetime.datetime.now()
-        logger.info('Batch {} done'.format(idx))
 
     avg_reward = ma.average()
     epoch_end = datetime.datetime.now()

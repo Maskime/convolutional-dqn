@@ -70,10 +70,8 @@ class ReplayMemory:
         # for entry in self.n_steps_iter:
         game_number = 1
         while nb_games > 0:
-            self.logger.debug('Starting Game {}'.format(game_number))
             game_generator = iter(self.n_steps)
             for entry in game_generator:
                 self.buffer.append(entry)  # we put 200 for the current episode
-            self.logger.debug('Game {} done'.format(game_number))
             game_number += 1
             nb_games -= 1
