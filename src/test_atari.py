@@ -202,7 +202,7 @@ for epoch in range(1, nb_epochs + 1):
                                                                    np.min(reward_steps), np.max(reward_steps)))
     for idx, batch in enumerate(memory.sample_batch(128)):
         start = datetime.datetime.now()
-        inputs, targets = eligibility_trace(batch, cnn)
+        inputs, targets = eligibility_trace(batch, cnn, device)
         predictions = cnn(inputs.to(device))
         loss_error = loss(predictions.to(device), targets.to(device))
         optimizer.zero_grad()
