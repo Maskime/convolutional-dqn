@@ -15,7 +15,6 @@ cdqn_logger.addHandler(stream_handler)
 def create_runlogger(run_number: int = 0, log_path: str = ''):
     logger_name = 'alien_gym.run.{}'.format(run_number)
     run_logger = logging.getLogger(logger_name)
-    run_logger.addHandler(stream_handler)
 
     formatter = logging.Formatter(cdqn_logformat)
     file_handler = logging.FileHandler(os.path.join(log_path, 'activity.log'), 'a')
