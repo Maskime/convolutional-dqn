@@ -37,7 +37,6 @@ import torch.optim as optim
 #     16 : "DOWNRIGHTFIRE",
 #     17 : "DOWNLEFTFIRE",
 # }
-from cdqn_logging import logger
 from gym import wrappers
 
 
@@ -117,11 +116,6 @@ class MA:
         return np.max(self.list_of_rewards)
 
 
-# class Config:
-#
-#     def __init__(self) -> None:
-#         super().__init__()
-
 Config = namedtuple('Config', ['nb_epoch',
                                'with_crop',
                                'with_color_pre',
@@ -132,12 +126,18 @@ Config = namedtuple('Config', ['nb_epoch',
                                'memory_capacity',
                                'optimizer_lr'])
 
+AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time'])
+
 
 class AlienGym:
 
     def __init__(self) -> None:
         super().__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.logger = logging.getLogger('alien_gym')
+        self.logger.info('Loading env')
+        self.env = gym.make('Alien-v0')
+        self.logger.info('env loaded')
 
     def eligibility_trace(self, batch, cnn):
         gamma = 0.99
@@ -162,33 +162,23 @@ class AlienGym:
     def video_callable(episode_id):
         return True
 
-    def crop_image(self, img: np.ndarray):
+    @staticmethod
+    def crop_image(img: np.ndarray):
         img_shape = img.shape
         cropped = img[5:img_shape[0] - 17, 16:img_shape[1] - 16]
         return cropped
 
-    def get_filehandler(self, file_dir: str) -> logging.Handler:
-        formatter = logging.Formatter(cdqn_logging.cdqn_logformat)
-        file_handler = logging.FileHandler(os.path.join(file_dir, 'activity.log'), 'a')
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-        return file_handler
-
-    def run(self, config: Config = None):
+    def run(self, config: Config = None, run_number: int = 0):
         videos_dir = str(time.time())
         root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
         latest_path = os.path.join(root_dir, 'latest')
         videos_path = os.path.realpath(os.path.join(root_dir, videos_dir))
         os.mkdir(videos_path, 0o775)
-        logger.addHandler(self.get_filehandler(videos_path))
+        logger_name, run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=videos_path)
 
-        logger.info('Loading env')
-        env = gym.make('Alien-v0')
-        logger.info('env loaded')
+        run_logger.info("I will use the device {}".format(self.device))
 
-        logger.info("I will use the device {}".format(self.device))
-
-        env = PreprocessImage(env, ImageSize.from_str(config.image_size), True, self.crop_image)
+        env = PreprocessImage(self.env, ImageSize.from_str(config.image_size), True, self.crop_image)
 
         env = wrappers.Monitor(env, videos_path, video_callable=AlienGym.video_callable)
 
@@ -203,7 +193,7 @@ class AlienGym:
         ai = AI(brain=cnn, body=body, device=self.device)
 
         n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=config.n_step)
-        memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=config.memory_capacity, logger=logger)
+        memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=config.memory_capacity, logger=run_logger)
 
         ma = MA(config.nb_epoch * config.nb_games)
 
@@ -213,14 +203,14 @@ class AlienGym:
         total_chrono = datetime.datetime.now()
 
         for epoch in range(1, nb_epochs + 1):
-            logger.info('Starting epoch {}'.format(epoch))
-            logger.info('Running games')
+            run_logger.info('Starting epoch {}'.format(epoch))
+            run_logger.info('Running games')
             start = datetime.datetime.now()
             memory.run_games(config.nb_games)
             end = datetime.datetime.now()
             reward_steps = n_steps.rewards_steps()
             ma.add(reward_steps)
-            logger.info(
+            run_logger.info(
                 'Games done in : {}s, avg score {}, min {}, max {}'.format((end - start).total_seconds(),
                                                                            np.mean(reward_steps),
                                                                            np.min(reward_steps), np.max(reward_steps)))
@@ -233,8 +223,11 @@ class AlienGym:
                 optimizer.step()
 
             avg_reward = ma.average()
-            logger.info('Epoch: {}, Average reward: {}'.format(epoch, avg_reward))
+            run_logger.info('Epoch: {}, Average reward: {}'.format(epoch, avg_reward))
         total_end = datetime.datetime.now()
-        logger.info(
-            '{}\t{}\t{}\t{}'.format(ma.average(), ma.min(), ma.max(), (total_end - total_chrono).total_seconds()))
+        total_seconds = (total_end - total_chrono).total_seconds()
+        run_logger.info(
+            '{}\t{}\t{}\t{}'.format(ma.average(), ma.min(), ma.max(), total_seconds))
         env.close()
+        return AlienGymResult(config=config, final_mean=ma.average(), min=ma.min(), max=ma.max(),
+                              total_time=total_seconds)
