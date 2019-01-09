@@ -168,7 +168,7 @@ class AlienGym:
         cropped = img[5:img_shape[0] - 17, 16:img_shape[1] - 16]
         return cropped
 
-    def run(self, config: Config = None, run_number: int = 0):
+    def run(self, config: Config = None, run_number: int = 0) -> AlienGymResult:
         videos_dir = str(time.time())
         root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
         latest_path = os.path.join(root_dir, 'latest')

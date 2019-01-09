@@ -1,4 +1,7 @@
-from alien_gym import Config, AlienGym
+import csv
+import datetime
+
+from alien_gym import Config, AlienGym, AlienGymResult
 from cdqn_logging import cdqn_logger
 
 nb_runs = 3  # number of runs for each configuration
@@ -29,9 +32,28 @@ configs = [Config(
 
 alien_gym = AlienGym()
 run_number = 0
+now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+
+def get_dict(result: AlienGymResult):
+    config_map = result.config._asdict()
+    general_map = result._asdict()
+    del general_map['config']
+    return {**config_map, **general_map}
+
+
+stat_filename = 'run_stats_{}.csv'.format(now)
+dummy = AlienGymResult(config=configs[0], final_mean=0, min=0, max=0, total_time=0, videos_dir='dir')
+fieldsname = get_dict(dummy).keys()
+with open(stat_filename, 'w') as csv_file:
+    writer = csv.DictWriter(csv_file, fieldnames=fieldsname)
+    writer.writeheader()
+
 for config in configs:
     for i in range(0, nb_runs):
         cdqn_logger.info('---------Starting run {}---------'.format(run_number))
-        result = alien_gym.run(config=config, run_number=run_number)
-        print(result)
+        result: AlienGymResult = alien_gym.run(config=config, run_number=run_number)
+        with open(stat_filename, 'a') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=get_dict(dummy).keys())
+            writer.writerow(get_dict(result=result))
         run_number += 1
