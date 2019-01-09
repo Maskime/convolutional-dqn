@@ -38,7 +38,6 @@ import torch.optim as optim
 # }
 from cdqn_logging import logger
 from gym import wrappers
-from torch.autograd import Variable
 
 
 class CNN(nn.Module):
@@ -52,7 +51,7 @@ class CNN(nn.Module):
         self.fc2 = nn.Linear(in_features=40, out_features=number_actions)
 
     def count_neurons(self, image_dim):
-        x = Variable(torch.rand(1, *image_dim))
+        x = torch.rand(1, *image_dim)
         x = F.relu(F.max_pool2d(self.conv1(x), 3, 2))
         x = F.relu(F.max_pool2d(self.conv2(x), 3, 2))
         x = F.relu(F.max_pool2d(self.conv3(x), 3, 2))
@@ -81,15 +80,16 @@ class SoftmaxBody(nn.Module):
 
 class AI:
 
-    def __init__(self, brain, body) -> None:
+    def __init__(self, brain, body, device) -> None:
         super().__init__()
         self.brain = brain
         self.body = body
+        self.device = device
 
     def __call__(self, inputs):
-        transformed = Variable(torch.from_numpy(np.array(inputs, dtype=np.float32)))
-        outputs = self.brain(transformed)
-        actions = self.body(outputs)
+        transformed = torch.from_numpy(np.array(inputs, dtype=np.float32))
+        outputs = self.brain(transformed.to(device))
+        actions = self.body(outputs.to(device))
         return actions.data.numpy()
 
 
@@ -112,15 +112,15 @@ class MA:
         return np.mean(self.list_of_rewards)
 
 
-def eligibility_trace(batch, cnn):
+def eligibility_trace(batch, cnn, device):
     gamma = 0.99
     inputs = []
     targets = []
     for series in batch:
         if len(series) == 0:
             continue
-        input = Variable(torch.from_numpy(np.array([series[0].state, series[-1].state], dtype=np.float32)))
-        output = cnn(input)
+        input = torch.from_numpy(np.array([series[0].state, series[-1].state], dtype=np.float32))
+        output = cnn(input.to(device))
         cumul_reward = 0.0 if series[-1].done else output[1].data.max()
         for step in reversed(series[:-1]):
             cumul_reward = step.reward + cumul_reward * gamma
@@ -161,6 +161,10 @@ logger.info('Loading env')
 env = gym.make('Alien-v0')
 logger.info('env loaded')
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+logger.info("I will use the device {}".format(device))
+
 env = image_preprocessing.PreprocessImage(env, 80, 80, True, crop_image)
 
 env = wrappers.Monitor(env, videos_path, video_callable=video_callable)
@@ -170,8 +174,10 @@ if os.path.exists(latest_path):
 os.symlink(videos_path, latest_path)
 
 cnn = CNN(env.action_space.n)
+cnn.to(device)
 body = SoftmaxBody(0.5)
-ai = AI(cnn, body)
+body.to(device)
+ai = AI(brain=cnn, body=body, device=device)
 
 n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=10)
 memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=1000, logger=logger)
@@ -197,9 +203,8 @@ for epoch in range(1, nb_epochs + 1):
     for idx, batch in enumerate(memory.sample_batch(128)):
         start = datetime.datetime.now()
         inputs, targets = eligibility_trace(batch, cnn)
-        inputs, targets = Variable(inputs), Variable(targets)
-        predictions = cnn(inputs)
-        loss_error = loss(predictions, targets)
+        predictions = cnn(inputs.to(device))
+        loss_error = loss(predictions.to(device), targets.to(device))
         optimizer.zero_grad()
         loss_error.backward()
         optimizer.step()
