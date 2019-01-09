@@ -90,7 +90,7 @@ class AI:
         transformed = torch.from_numpy(np.array(inputs, dtype=np.float32))
         outputs = self.brain(transformed.to(device))
         actions = self.body(outputs.to(device))
-        return actions.data.numpy()
+        return actions.cpu().numpy()
 
 
 class MA:
