@@ -1,6 +1,8 @@
+import argparse
 import csv
 import datetime
 from random import randint, uniform
+from typing import Any
 
 from alien_gym import Config, AlienGym, AlienGymResult
 from cdqn_logging import cdqn_logger
@@ -11,6 +13,50 @@ configs = []
 # Need some consistency between test
 default_nb_epoch = 50
 default_imagesize = '80x80'
+
+
+def video_callable(episode_id):
+    return True
+
+
+default_config = Config(
+    nb_epoch=default_nb_epoch, with_crop=True, with_color_pre=True, image_size=default_imagesize, nb_games=3,
+    softmax_temp=1.0, n_step=10, memory_capacity=8000, optimizer_lr=0.001, gamma=0.99, record=None)
+
+parser = argparse.ArgumentParser(description='Run CDQN on AlienV0 OpenAI Gym')
+parser.add_argument('--image-size', dest='image_size',
+                    help='Image size the CNN will be working with (format : WxH)')
+parser.add_argument('--nb-epoch', dest='nb_epoch', type=int, help='Number of epoch that will be run')
+parser.add_argument('--without-crop', dest='with_crop', action='store_false',
+                    help='Disable the image cropping when pre-processing the image')
+parser.add_argument('--without-color_pre', dest='with_color_pre', action='store_false',
+                    help='Disable the image color alteration when pre-processing the image')
+parser.add_argument('--nb-games', dest='nb_games', type=int, help='Number of games that will be play for 1 epoch')
+parser.add_argument('--softmax-temp', dest='softmax_temp', type=float,
+                    help='Constant value that will be applied to the softmax function')
+parser.add_argument('--memory-capacity', dest='memory_capacity', type=int,
+                    help='Number of n-steps that will be saved for the n-step Q-Learning')
+parser.add_argument('--optimizer-lr', dest='optimizer_lr', type=float, help='Learning rate for the optimizer')
+parser.add_argument('--n-step', dest='n_step', type=int, help='Number of steps before backprop is done on the CNN')
+parser.add_argument('--gamma', dest='gamma', type=float, help='Living penalty')
+parser.add_argument('--record', dest='with_record', action='store_true', help='Should we record the games ?')
+parser.add_argument('--nb-config', dest='nb_config', type=int,
+                    help='If specify will generate nb_config random configurations', default=0)
+
+command_line = vars(parser.parse_args())
+command_line = dict((k, v) for k, v in command_line.items() if v is not None)
+print(command_line)
+default_config_dict = default_config._asdict()
+default_config_dict.update(command_line)
+if command_line['with_record']:
+    default_config_dict['record'] = video_callable
+del default_config_dict['with_record']
+nb_configurations = default_config_dict['nb_config']
+del default_config_dict['nb_config']
+command_line_config = Config(**default_config_dict)
+
+configs.append(command_line_config)
+
 for i in range(0, nb_configurations):
     configs.append(
         Config(
@@ -24,6 +70,7 @@ for i in range(0, nb_configurations):
             optimizer_lr=uniform(0.01, 0.001),
             n_step=randint(5, 200),
             gamma=uniform(1., 0.01),
+            record=video_callable
         ))
 
 alien_gym = AlienGym()
@@ -45,6 +92,7 @@ with open(stat_filename, 'w') as csv_file:
     writer = csv.DictWriter(csv_file, fieldnames=fieldsname)
     writer.writeheader()
 
+cdqn_logger.info('[{}] config to run'.format(len(configs)))
 for config in configs:
     for i in range(0, nb_runs):
         cdqn_logger.info('---------Starting run {}---------'.format(run_number))

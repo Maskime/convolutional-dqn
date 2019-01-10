@@ -125,7 +125,8 @@ Config = namedtuple('Config', ['nb_epoch',
                                'n_step',
                                'memory_capacity',
                                'optimizer_lr',
-                               'gamma'])
+                               'gamma',
+                               'record'])
 
 AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time', 'videos_dir'])
 
@@ -136,9 +137,6 @@ class AlienGym:
         super().__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.logger = logging.getLogger('alien_gym')
-        self.logger.info('Loading env')
-        self.env = gym.make('Alien-v0')
-        self.logger.info('env loaded')
 
     def eligibility_trace(self, batch, cnn, gamma):
         inputs = []
@@ -159,29 +157,27 @@ class AlienGym:
         return torch.from_numpy(np.array(inputs, dtype=np.float32)), torch.stack(targets)
 
     @staticmethod
-    def video_callable(episode_id):
-        return True
-
-    @staticmethod
     def crop_image(img: np.ndarray):
         img_shape = img.shape
         cropped = img[5:img_shape[0] - 17, 16:img_shape[1] - 16]
         return cropped
 
     def run(self, config: Config = None, run_number: int = 0) -> AlienGymResult:
+        env = gym.make('Alien-v0')
         videos_dir = str(time.time())
         root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
         latest_path = os.path.join(root_dir, 'latest')
         videos_path = os.path.realpath(os.path.join(root_dir, videos_dir))
         os.mkdir(videos_path, 0o775)
-        logger_name, run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=videos_path)
+        logger_name, run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=videos_path,
+                                                                filename=videos_dir)
 
         run_logger.info("I will use the device {}".format(self.device))
         run_logger.info('Using config : {}'.format(config))
 
-        env = PreprocessImage(self.env, ImageSize.from_str(config.image_size), True, self.crop_image)
-
-        env = wrappers.Monitor(env, videos_path, video_callable=AlienGym.video_callable)
+        env = PreprocessImage(env, ImageSize.from_str(config.image_size), True, self.crop_image)
+        if config.record is not None and callable(config.record):
+            env = wrappers.Monitor(env, videos_path, video_callable=config.record)
 
         if os.path.exists(latest_path):
             os.unlink(latest_path)
@@ -215,7 +211,7 @@ class AlienGym:
                 'Games done in : {}s, avg score {}, min {}, max {}'.format((end - start).total_seconds(),
                                                                            np.mean(reward_steps),
                                                                            np.min(reward_steps), np.max(reward_steps)))
-            for idx, batch in enumerate(memory.sample_batch(128)):
+            for batch in memory.sample_batch(128):
                 inputs, targets = self.eligibility_trace(batch, cnn, config.gamma)
                 predictions = cnn(inputs.to(self.device))
                 loss_error = loss(predictions.to(self.device), targets.to(self.device))
@@ -225,6 +221,7 @@ class AlienGym:
 
             avg_reward = ma.average()
             run_logger.info('Epoch: {}, Average reward: {}'.format(epoch, avg_reward))
+            torch.save(cnn.state_dict(), os.path.join(videos_path, '{}_{}.pth'.format(videos_dir, epoch)))
         total_end = datetime.datetime.now()
         total_seconds = (total_end - total_chrono).total_seconds()
         run_logger.info(
