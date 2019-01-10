@@ -1,74 +1,30 @@
 import csv
 import datetime
+from random import randint, uniform
 
 from alien_gym import Config, AlienGym, AlienGymResult
 from cdqn_logging import cdqn_logger
 
-nb_runs = 3  # number of runs for each configuration
-
-configs = [
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
-        memory_capacity=1000, optimizer_lr=0.001,
-        n_step=10
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
-        memory_capacity=1000, optimizer_lr=0.001,
-        n_step=20
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
-        memory_capacity=1000, optimizer_lr=0.001,
-        n_step=40
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
-        memory_capacity=1000, optimizer_lr=0.001,
-        n_step=80
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
-        n_step=10, optimizer_lr=0.001,
-        memory_capacity=2000
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
-        n_step=10, optimizer_lr=0.001,
-        memory_capacity=4000
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, softmax_temp=0.5,
-        n_step=10, optimizer_lr=0.001,
-        memory_capacity=8000
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
-        n_step=10, optimizer_lr=0.001,
-        softmax_temp=0.1
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
-        n_step=10, optimizer_lr=0.001,
-        softmax_temp=0.2
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
-        n_step=10, optimizer_lr=0.001,
-        softmax_temp=0.4
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
-        n_step=10, optimizer_lr=0.001,
-        softmax_temp=0.8
-    ),
-    Config(
-        nb_epoch=20, with_crop=True, with_color_pre=True, image_size='80x80', nb_games=3, memory_capacity=1000,
-        n_step=10, optimizer_lr=0.001,
-        softmax_temp=1.6
-    )
-
-]
+nb_runs = 1  # number of runs for each configuration
+nb_configurations = 1000
+configs = []
+# Need some consistency between test
+default_nb_epoch = 50
+default_imagesize = '80x80'
+for i in range(0, nb_configurations):
+    configs.append(
+        Config(
+            image_size=default_imagesize,
+            nb_epoch=default_nb_epoch,
+            with_crop=bool(randint(0, 1)),
+            with_color_pre=bool(randint(0, 1)),
+            nb_games=randint(2, 10),
+            softmax_temp=uniform(0.1, 1.5),
+            memory_capacity=randint(50, 10000),
+            optimizer_lr=uniform(0.01, 0.001),
+            n_step=randint(5, 200),
+            gamma=uniform(1., 0.01),
+        ))
 
 alien_gym = AlienGym()
 run_number = 0

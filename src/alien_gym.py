@@ -124,7 +124,8 @@ Config = namedtuple('Config', ['nb_epoch',
                                'softmax_temp',
                                'n_step',
                                'memory_capacity',
-                               'optimizer_lr'])
+                               'optimizer_lr',
+                               'gamma'])
 
 AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time', 'videos_dir'])
 
@@ -139,8 +140,7 @@ class AlienGym:
         self.env = gym.make('Alien-v0')
         self.logger.info('env loaded')
 
-    def eligibility_trace(self, batch, cnn):
-        gamma = 0.99
+    def eligibility_trace(self, batch, cnn, gamma):
         inputs = []
         targets = []
         for series in batch:
@@ -177,6 +177,7 @@ class AlienGym:
         logger_name, run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=videos_path)
 
         run_logger.info("I will use the device {}".format(self.device))
+        run_logger.info('Using config : {}'.format(config))
 
         env = PreprocessImage(self.env, ImageSize.from_str(config.image_size), True, self.crop_image)
 
@@ -215,7 +216,7 @@ class AlienGym:
                                                                            np.mean(reward_steps),
                                                                            np.min(reward_steps), np.max(reward_steps)))
             for idx, batch in enumerate(memory.sample_batch(128)):
-                inputs, targets = self.eligibility_trace(batch, cnn)
+                inputs, targets = self.eligibility_trace(batch, cnn, config.gamma)
                 predictions = cnn(inputs.to(self.device))
                 loss_error = loss(predictions.to(self.device), targets.to(self.device))
                 optimizer.zero_grad()
