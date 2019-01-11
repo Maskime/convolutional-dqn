@@ -236,7 +236,7 @@ class AlienGym:
                                         optimizer_state_dict=alien_ai.optimizer.state_dict(), epoch=epoch,
                                         device=self.device)
         checkpoint_path = os.path.join(data_path, '{}_{}.pth'.format(run_name, epoch))
-        self.run_logger.debug('Saving checkpoint to {}', checkpoint_path)
+        self.run_logger.debug('Saving checkpoint to {}'.format(checkpoint_path))
         torch.save(checkpoint._asdict(), checkpoint_path)
 
     def init_model(self, config: Config, env) -> AlienGymAI:
