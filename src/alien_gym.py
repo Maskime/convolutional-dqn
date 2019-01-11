@@ -108,12 +108,18 @@ class MA:
             self.list_of_rewards.append(cumul_reward)
 
     def average(self):
+        if len(self.list_of_rewards) == 0:
+            return 0
         return np.mean(self.list_of_rewards)
 
     def min(self):
+        if len(self.list_of_rewards) == 0:
+            return 0
         return np.min(self.list_of_rewards)
 
     def max(self):
+        if len(self.list_of_rewards) == 0:
+            return 0
         return np.max(self.list_of_rewards)
 
 
