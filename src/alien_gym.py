@@ -131,8 +131,12 @@ Config = namedtuple('Config', ['nb_epoch',
 
 AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time', 'run_name'])
 
-AlienGymCheckpoint = namedtuple('AlienGymCheckpoint',
-                                ['config', 'model_state_dict', 'optimizer_state_dict', 'epoch', 'device'])
+AlienGymCheckpoint = namedtuple('AlienGymCheckpoint', ['config',
+                                                       'model_state_dict',
+                                                       'optimizer_state_dict',
+                                                       'epoch',
+                                                       'run_name',
+                                                       'device'])
 AlienGymAI = namedtuple('AlienGymAI', ['cnn', 'ai', 'loss', 'optimizer', 'n_step', 'replay_memory'])
 
 
@@ -183,8 +187,16 @@ class AlienGym:
             env = wrappers.Monitor(env, data_path, video_callable=config.record)
         return env, data_path
 
-    def run(self, config: Config = None, run_number: int = 0) -> AlienGymResult:
+    def run(self, config: Config, run_number: int, checkpoint_path: str) -> AlienGymResult:
         run_name = str(time.time())
+        starting_epoch = 1
+        checkpoint = None
+        if checkpoint_path:
+            checkpoint: AlienGymCheckpoint = self.load_checkpoint(path=checkpoint_path, config=config)
+            self.logger.debug(checkpoint)
+            run_name = checkpoint.run_name
+            starting_epoch = checkpoint.epoch + 1
+
         env, data_path = self.prepare_env(config=config, run_name=run_name)
         print(data_path)
         self.run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=data_path,
@@ -193,14 +205,13 @@ class AlienGym:
         self.run_logger.info("I will use the device {}".format(self.device))
         self.run_logger.info('Using config : {}'.format(config))
 
-        alien_ai: AlienGymAI = self.init_model(config, env)
+        alien_ai: AlienGymAI = self.init_model(config=config, env=env, checkpoint=checkpoint)
 
         ma = MA(config.nb_epoch * config.nb_games)
 
-        nb_epochs = config.nb_epoch
         total_chrono = datetime.datetime.now()
 
-        for epoch in range(1, nb_epochs + 1):
+        for epoch in range(starting_epoch, config.nb_epoch + 1):
             self.run_logger.info('Starting epoch {}'.format(epoch))
             start = datetime.datetime.now()
             alien_ai.replay_memory.run_games(config.nb_games)
@@ -234,12 +245,12 @@ class AlienGym:
             return
         checkpoint = AlienGymCheckpoint(config=config._asdict(), model_state_dict=alien_ai.cnn.state_dict(),
                                         optimizer_state_dict=alien_ai.optimizer.state_dict(), epoch=epoch,
-                                        device=self.device)
+                                        device=self.device, run_name=run_name)
         checkpoint_path = os.path.join(data_path, '{}_{}.pth'.format(run_name, epoch))
         self.run_logger.debug('Saving checkpoint to {}'.format(checkpoint_path))
         torch.save(checkpoint._asdict(), checkpoint_path)
 
-    def init_model(self, config: Config, env) -> AlienGymAI:
+    def init_model(self, config: Config, env, checkpoint: AlienGymCheckpoint = None) -> AlienGymAI:
         image_size: ImageSize = ImageSize.from_str(config.image_size)
         cnn = CNN(env.action_space.n, image_w=image_size.w, image_h=image_size.h)
         cnn.to(self.device)
@@ -250,3 +261,7 @@ class AlienGym:
         n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=config.n_step)
         memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=config.memory_capacity)
         return AlienGymAI(cnn=cnn, ai=ai, loss=nn.MSELoss(), optimizer=optimizer, n_step=n_steps, replay_memory=memory)
+
+    def load_checkpoint(self, path: str, config: Config) -> AlienGymCheckpoint:
+        content = torch.load(path)
+        return AlienGymCheckpoint(**content)

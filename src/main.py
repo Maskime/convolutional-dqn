@@ -27,7 +27,7 @@ parser.add_argument('--image-size', dest='image_size',
                     help='Image size the CNN will be working with (format : WxH)')
 parser.add_argument('--nb-epoch', dest='nb_epoch', type=int,
                     help='''Number of epoch that will be run. If the --checkpoint option is set, 
-                    will resume training for this amount of epoch''')
+                    will continue training for this amount of epoch''')
 parser.add_argument('--without-crop', dest='with_crop', action='store_false',
                     help='Disable the image cropping when pre-processing the image')
 parser.add_argument('--without-color_pre', dest='with_color_pre', action='store_false',
@@ -55,6 +55,9 @@ commandline_config: CommandLineConfig = extract_commandlineconfig(default_config
                                                                   command_line=vars(parser.parse_args()),
                                                                   video_callable=video_callable)
 nb_configurations = commandline_config.nb_config
+if commandline_config.checkpoint:
+    nb_configurations = 0
+
 configs.append(commandline_config.config)
 
 for i in range(0, nb_configurations):
@@ -97,8 +100,8 @@ cdqn_logger.info('[{}] config to run'.format(len(configs)))
 for config in configs:
     for i in range(0, nb_runs):
         cdqn_logger.info('---------Starting run {}---------'.format(run_number))
-        result: AlienGymResult = alien_gym.run(config=config, run_number=run_number)
+        result: AlienGymResult = alien_gym.run(config=config, run_number=run_number, checkpoint=commandline_config.checkpoint)
         with open(stat_filename, 'a') as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=get_dict(dummy).keys())
+            writer = csv.DictWriter(csv_file, fieldnames=fieldsname)
             writer.writerow(get_dict(result=result))
         run_number += 1
