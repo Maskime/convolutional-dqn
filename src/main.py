@@ -46,7 +46,7 @@ parser.add_argument('--record', dest='with_record', action='store_true', help='S
 parser.add_argument('--nb-config', dest='nb_config', type=int,
                     help='If specify will generate nb_config random configurations', default=0)
 parser.add_argument('--checkpoint', dest='checkpoint', type=str, help='Will resume training from a checkpoint file')
-parser.add_argument('--play', dest='is_train', action='store_true',
+parser.add_argument('--play', dest='is_train', action='store_false',
                     help='''No training happening, you MUST provide a checkpoint file with this option. 
                     If you set the --nb-games option this value will be use for the number of games played with the
                     set model''')

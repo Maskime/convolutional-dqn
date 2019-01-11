@@ -187,11 +187,11 @@ class AlienGym:
         run_name = str(time.time())
         env, data_path = self.prepare_env(config=config, run_name=run_name)
         print(data_path)
-        run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=data_path,
-                                                   filename=run_name)
+        self.run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=data_path,
+                                                        filename=run_name)
 
-        run_logger.info("I will use the device {}".format(self.device))
-        run_logger.info('Using config : {}'.format(config))
+        self.run_logger.info("I will use the device {}".format(self.device))
+        self.run_logger.info('Using config : {}'.format(config))
 
         alien_ai: AlienGymAI = self.init_model(config, env)
 
@@ -201,13 +201,13 @@ class AlienGym:
         total_chrono = datetime.datetime.now()
 
         for epoch in range(1, nb_epochs + 1):
-            run_logger.info('Starting epoch {}'.format(epoch))
+            self.run_logger.info('Starting epoch {}'.format(epoch))
             start = datetime.datetime.now()
             alien_ai.replay_memory.run_games(config.nb_games)
             end = datetime.datetime.now()
             reward_steps = alien_ai.n_step.rewards_steps()
             ma.add(reward_steps)
-            run_logger.info(
+            self.run_logger.info(
                 'Games done in : {}s, avg score {}, min {}, max {}'.format((end - start).total_seconds(),
                                                                            np.mean(reward_steps),
                                                                            np.min(reward_steps), np.max(reward_steps)))
@@ -221,7 +221,7 @@ class AlienGym:
                     alien_ai.optimizer.step()
 
             avg_reward = ma.average()
-            run_logger.info('Epoch: {}, Average reward: {}'.format(epoch, avg_reward))
+            self.run_logger.info('Epoch: {}, Average reward: {}'.format(epoch, avg_reward))
             self.create_checkpoint(alien_ai, config, data_path, epoch, run_name)
         total_end = datetime.datetime.now()
         total_seconds = (total_end - total_chrono).total_seconds()
@@ -235,7 +235,9 @@ class AlienGym:
         checkpoint = AlienGymCheckpoint(config=config._asdict(), model_state_dict=alien_ai.cnn.state_dict(),
                                         optimizer_state_dict=alien_ai.optimizer.state_dict(), epoch=epoch,
                                         device=self.device)
-        torch.save(checkpoint._asdict(), os.path.join(data_path, '{}_{}.pth'.format(run_name, epoch)))
+        checkpoint_path = os.path.join(data_path, '{}_{}.pth'.format(run_name, epoch))
+        self.run_logger.debug('Saving checkpoint to {}', checkpoint_path)
+        torch.save(checkpoint._asdict(), checkpoint_path)
 
     def init_model(self, config: Config, env) -> AlienGymAI:
         image_size: ImageSize = ImageSize.from_str(config.image_size)
