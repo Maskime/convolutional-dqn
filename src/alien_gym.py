@@ -224,7 +224,7 @@ class AlienGym:
 
         total_chrono = datetime.datetime.now()
 
-        for epoch in range(starting_epoch, config.nb_epoch + 1):
+        for epoch in range(starting_epoch, starting_epoch + config.nb_epoch + 1):
             self.run_logger.info('Starting epoch {}'.format(epoch))
             start = datetime.datetime.now()
             alien_ai.replay_memory.run_games(config.nb_games)
