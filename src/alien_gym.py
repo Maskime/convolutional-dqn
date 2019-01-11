@@ -181,6 +181,7 @@ class AlienGym:
             if not os.path.exists(incremental_datapath):
                 data_path = incremental_datapath
                 os.mkdir(data_path, 0o775)
+                break
 
         if os.path.exists(latest_path):
             os.unlink(latest_path)
