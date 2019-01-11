@@ -100,7 +100,8 @@ cdqn_logger.info('[{}] config to run'.format(len(configs)))
 for config in configs:
     for i in range(0, nb_runs):
         cdqn_logger.info('---------Starting run {}---------'.format(run_number))
-        result: AlienGymResult = alien_gym.run(config=config, run_number=run_number, checkpoint=commandline_config.checkpoint)
+        result: AlienGymResult = alien_gym.run(config=config, run_number=run_number,
+                                               checkpoint_path=commandline_config.checkpoint)
         with open(stat_filename, 'a') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=fieldsname)
             writer.writerow(get_dict(result=result))
