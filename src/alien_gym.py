@@ -280,10 +280,12 @@ class AlienGym:
         is_training = config.is_train
         nb_games = config.nb_games
         nb_epochs = config.nb_epoch
+        record = config.record
         config_dict = config._asdict()
         config_dict.update(checkpoint.config)
         config_dict['is_train'] = is_training
         config_dict['nb_epoch'] = nb_epochs
+        config_dict['record'] = record
         if not is_training:
             config_dict['nb_games'] = nb_games
         config = Config(**config_dict)
