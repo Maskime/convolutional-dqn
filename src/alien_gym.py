@@ -1,5 +1,6 @@
 import warnings
 from collections import deque, namedtuple
+from typing import Tuple
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -175,7 +176,11 @@ class AlienGym:
         root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'data'))
         latest_path = os.path.join(root_dir, 'latest')
         data_path = os.path.realpath(os.path.join(root_dir, run_name))
-        os.mkdir(data_path, 0o775)
+        for i in range(0, 99):
+            incremental_datapath = '{}_{}'.format(data_path, i)
+            if not os.path.exists(incremental_datapath):
+                data_path = incremental_datapath
+                os.mkdir(data_path, 0o775)
 
         if os.path.exists(latest_path):
             os.unlink(latest_path)
@@ -190,10 +195,11 @@ class AlienGym:
     def run(self, config: Config, run_number: int, checkpoint_path: str) -> AlienGymResult:
         run_name = str(time.time())
         starting_epoch = 1
-        checkpoint = None
+        checkpoint: AlienGymCheckpoint = None
         if checkpoint_path:
-            checkpoint: AlienGymCheckpoint = self.load_checkpoint(path=checkpoint_path, config=config)
-            self.logger.debug(checkpoint)
+            checkpoint, updated_config = self.load_checkpoint(path=checkpoint_path,
+                                                              config=config)
+            config = updated_config
             run_name = checkpoint.run_name
             starting_epoch = checkpoint.epoch + 1
 
@@ -254,14 +260,31 @@ class AlienGym:
         image_size: ImageSize = ImageSize.from_str(config.image_size)
         cnn = CNN(env.action_space.n, image_w=image_size.w, image_h=image_size.h)
         cnn.to(self.device)
+        if checkpoint is not None:
+            cnn.load_state_dict(checkpoint.model_state_dict)
+            cnn.eval()
         body = SoftmaxBody(config.softmax_temp)
         body.to(self.device)
         optimizer = optim.Adam(cnn.parameters(), lr=config.optimizer_lr)
+        if checkpoint is not None:
+            optimizer.load_state_dict(checkpoint.optimizer_state_dict)
         ai = AI(brain=cnn, body=body, device=self.device)
         n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=config.n_step)
         memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=config.memory_capacity)
         return AlienGymAI(cnn=cnn, ai=ai, loss=nn.MSELoss(), optimizer=optimizer, n_step=n_steps, replay_memory=memory)
 
-    def load_checkpoint(self, path: str, config: Config) -> AlienGymCheckpoint:
+    def load_checkpoint(self, path: str, config: Config) -> Tuple[AlienGymCheckpoint, Config]:
         content = torch.load(path)
-        return AlienGymCheckpoint(**content)
+        checkpoint = AlienGymCheckpoint(**content)
+        is_training = config.is_train
+        nb_games = config.nb_games
+        nb_epochs = config.nb_epoch
+        config_dict = config._asdict()
+        config_dict.update(checkpoint.config)
+        config = Config(**config_dict)
+        config.is_train = is_training
+        config.nb_epoch = nb_epochs
+        if not config.is_train:
+            config.nb_games = nb_games
+
+        return checkpoint, config
