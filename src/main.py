@@ -15,6 +15,7 @@ default_imagesize = '80x80'
 
 
 def video_callable(episode_id):
+    cdqn_logger.debug('Calling video_callable for episode [{}]'.format(episode_id))
     return True
 
 
