@@ -51,11 +51,10 @@ class NStepProgress:
 
 class ReplayMemory:
 
-    def __init__(self, n_steps, logger, capacity=10000):
+    def __init__(self, n_steps, capacity=10000):
         self.capacity = capacity
         self.n_steps = n_steps
         self.buffer = deque(maxlen=capacity)
-        self.logger = logger
 
     def sample_batch(self, batch_size):  # creates an iterator that returns random batches
         ofs = 0

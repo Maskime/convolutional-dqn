@@ -42,12 +42,12 @@ from gym import wrappers
 
 class CNN(nn.Module):
 
-    def __init__(self, number_actions):
+    def __init__(self, number_actions, image_w: int = 80, image_h: int = 80):
         super(CNN, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3)
         self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=2)
-        self.fc1 = nn.Linear(in_features=self.count_neurons((1, 80, 80)), out_features=40)
+        self.fc1 = nn.Linear(in_features=self.count_neurons((1, image_w, image_h)), out_features=40)
         self.fc2 = nn.Linear(in_features=40, out_features=number_actions)
 
     def count_neurons(self, image_dim):
@@ -126,9 +126,14 @@ Config = namedtuple('Config', ['nb_epoch',
                                'memory_capacity',
                                'optimizer_lr',
                                'gamma',
-                               'record'])
+                               'record',
+                               'is_train'])
 
-AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time', 'videos_dir'])
+AlienGymResult = namedtuple('AlienGymResult', ['config', 'final_mean', 'min', 'max', 'total_time', 'run_name'])
+
+AlienGymCheckpoint = namedtuple('AlienGymCheckpoint',
+                                ['config', 'model_state_dict', 'optimizer_state_dict', 'epoch', 'device'])
+AlienGymAI = namedtuple('AlienGymAI', ['cnn', 'ai', 'loss', 'optimizer', 'n_step', 'replay_memory'])
 
 
 class AlienGym:
@@ -162,70 +167,83 @@ class AlienGym:
         cropped = img[5:img_shape[0] - 17, 16:img_shape[1] - 16]
         return cropped
 
-    def run(self, config: Config = None, run_number: int = 0) -> AlienGymResult:
-        env = gym.make('Alien-v0')
-        videos_dir = str(time.time())
-        root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'videos'))
+    def prepare_env(self, config: Config, run_name: str):
+        root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'data'))
         latest_path = os.path.join(root_dir, 'latest')
-        videos_path = os.path.realpath(os.path.join(root_dir, videos_dir))
+        videos_path = os.path.realpath(os.path.join(root_dir, run_name))
         os.mkdir(videos_path, 0o775)
-        logger_name, run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=videos_path,
-                                                                filename=videos_dir)
-
-        run_logger.info("I will use the device {}".format(self.device))
-        run_logger.info('Using config : {}'.format(config))
-
-        env = PreprocessImage(env, ImageSize.from_str(config.image_size), True, self.crop_image)
-        if config.record is not None and callable(config.record):
-            env = wrappers.Monitor(env, videos_path, video_callable=config.record)
 
         if os.path.exists(latest_path):
             os.unlink(latest_path)
         os.symlink(videos_path, latest_path)
 
-        cnn = CNN(env.action_space.n)
-        cnn.to(self.device)
-        body = SoftmaxBody(config.softmax_temp)
-        body.to(self.device)
-        ai = AI(brain=cnn, body=body, device=self.device)
+        env = gym.make('Alien-v0')
+        env = PreprocessImage(env, ImageSize.from_str(config.image_size), True, self.crop_image)
+        if config.record is not None and callable(config.record):
+            env = wrappers.Monitor(env, videos_path, video_callable=config.record)
+        return env, root_dir
 
-        n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=config.n_step)
-        memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=config.memory_capacity, logger=run_logger)
+    def run(self, config: Config = None, run_number: int = 0) -> AlienGymResult:
+        run_name = str(time.time())
+        env, data_path = self.prepare_env(config=config, run_name=run_name)
+        run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=data_path,
+                                                   filename=run_name)
+
+        run_logger.info("I will use the device {}".format(self.device))
+        run_logger.info('Using config : {}'.format(config))
+
+        alien_ai: AlienGymAI = self.init_model(config, env)
 
         ma = MA(config.nb_epoch * config.nb_games)
 
-        loss = nn.MSELoss()
-        optimizer = optim.Adam(cnn.parameters(), lr=config.optimizer_lr)
         nb_epochs = config.nb_epoch
         total_chrono = datetime.datetime.now()
 
         for epoch in range(1, nb_epochs + 1):
             run_logger.info('Starting epoch {}'.format(epoch))
-            run_logger.info('Running games')
             start = datetime.datetime.now()
-            memory.run_games(config.nb_games)
+            alien_ai.replay_memory.run_games(config.nb_games)
             end = datetime.datetime.now()
-            reward_steps = n_steps.rewards_steps()
+            reward_steps = alien_ai.n_step.rewards_steps()
             ma.add(reward_steps)
             run_logger.info(
                 'Games done in : {}s, avg score {}, min {}, max {}'.format((end - start).total_seconds(),
                                                                            np.mean(reward_steps),
                                                                            np.min(reward_steps), np.max(reward_steps)))
-            for batch in memory.sample_batch(128):
-                inputs, targets = self.eligibility_trace(batch, cnn, config.gamma)
-                predictions = cnn(inputs.to(self.device))
-                loss_error = loss(predictions.to(self.device), targets.to(self.device))
-                optimizer.zero_grad()
-                loss_error.backward()
-                optimizer.step()
+            if config.is_train:
+                for batch in alien_ai.replay_memory.sample_batch(128):
+                    inputs, targets = self.eligibility_trace(batch, alien_ai.cnn, config.gamma)
+                    predictions = alien_ai.cnn(inputs.to(self.device))
+                    loss_error = alien_ai.loss(predictions.to(self.device), targets.to(self.device))
+                    alien_ai.optimizer.zero_grad()
+                    loss_error.backward()
+                    alien_ai.optimizer.step()
 
             avg_reward = ma.average()
             run_logger.info('Epoch: {}, Average reward: {}'.format(epoch, avg_reward))
-            torch.save(cnn.state_dict(), os.path.join(videos_path, '{}_{}.pth'.format(videos_dir, epoch)))
+            self.create_checkpoint(alien_ai, config, data_path, epoch, run_name)
         total_end = datetime.datetime.now()
         total_seconds = (total_end - total_chrono).total_seconds()
-        run_logger.info(
-            '{}\t{}\t{}\t{}'.format(ma.average(), ma.min(), ma.max(), total_seconds))
         env.close()
         return AlienGymResult(config=config, final_mean=ma.average(), min=ma.min(), max=ma.max(),
-                              total_time=total_seconds, videos_dir=videos_dir)
+                              total_time=total_seconds, run_name=run_name)
+
+    def create_checkpoint(self, alien_ai: AlienGymAI, config: Config, data_path: str, epoch: int, run_name: str):
+        if not config.is_train:
+            return
+        checkpoint = AlienGymCheckpoint(config=config._asdict(), model_state_dict=alien_ai.cnn.state_dict(),
+                                        optimizer_state_dict=alien_ai.optimizer.state_dict(), epoch=epoch,
+                                        device=self.device)
+        torch.save(checkpoint._asdict(), os.path.join(data_path, '{}_{}.pth'.format(run_name, epoch)))
+
+    def init_model(self, config: Config, env) -> AlienGymAI:
+        image_size: ImageSize = ImageSize.from_str(config.image_size)
+        cnn = CNN(env.action_space.n, image_w=image_size.w, image_h=image_size.h)
+        cnn.to(self.device)
+        body = SoftmaxBody(config.softmax_temp)
+        body.to(self.device)
+        optimizer = optim.Adam(cnn.parameters(), lr=config.optimizer_lr)
+        ai = AI(brain=cnn, body=body, device=self.device)
+        n_steps = experience_replay.NStepProgress(env=env, ai=ai, n_step=config.n_step)
+        memory = experience_replay.ReplayMemory(n_steps=n_steps, capacity=config.memory_capacity)
+        return AlienGymAI(cnn=cnn, ai=ai, loss=nn.MSELoss(), optimizer=optimizer, n_step=n_steps, replay_memory=memory)

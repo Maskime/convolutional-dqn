@@ -21,4 +21,4 @@ def create_runlogger(run_number: int = 0, log_path: str = '', filename: str = 'a
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     run_logger.addHandler(file_handler)
-    return logger_name, run_logger
+    return run_logger
