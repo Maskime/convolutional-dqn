@@ -170,22 +170,23 @@ class AlienGym:
     def prepare_env(self, config: Config, run_name: str):
         root_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'data'))
         latest_path = os.path.join(root_dir, 'latest')
-        videos_path = os.path.realpath(os.path.join(root_dir, run_name))
-        os.mkdir(videos_path, 0o775)
+        data_path = os.path.realpath(os.path.join(root_dir, run_name))
+        os.mkdir(data_path, 0o775)
 
         if os.path.exists(latest_path):
             os.unlink(latest_path)
-        os.symlink(videos_path, latest_path)
+        os.symlink(data_path, latest_path)
 
         env = gym.make('Alien-v0')
         env = PreprocessImage(env, ImageSize.from_str(config.image_size), True, self.crop_image)
         if config.record is not None and callable(config.record):
-            env = wrappers.Monitor(env, videos_path, video_callable=config.record)
-        return env, root_dir
+            env = wrappers.Monitor(env, data_path, video_callable=config.record)
+        return env, data_path
 
     def run(self, config: Config = None, run_number: int = 0) -> AlienGymResult:
         run_name = str(time.time())
         env, data_path = self.prepare_env(config=config, run_name=run_name)
+        print(data_path)
         run_logger = cdqn_logging.create_runlogger(run_number=run_number, log_path=data_path,
                                                    filename=run_name)
 

@@ -21,4 +21,10 @@ def create_runlogger(run_number: int = 0, log_path: str = '', filename: str = 'a
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     run_logger.addHandler(file_handler)
-    return run_logger
+    return RunLoggerAdapter(run_logger, {'run_name': filename})
+
+
+class RunLoggerAdapter(logging.LoggerAdapter):
+
+    def process(self, msg, kwargs):
+        return '{} :: {}'.format(self.extra['run_name'], msg), kwargs
