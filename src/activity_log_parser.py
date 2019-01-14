@@ -1,3 +1,4 @@
+import argparse
 import csv
 import glob
 import os
@@ -11,6 +12,12 @@ log_files = [os.path.realpath(path) for path in glob.glob(glob_pattern)]
 stats_fields = ['epoch', 'avg_score', 'min_score', 'max_score', 'global_avg']
 AlienGymRunStats = namedtuple('AlienGymRunStats', stats_fields)
 
+parser = argparse.ArgumentParser('Parse run activity logs')
+parser.add_argument('--file', dest='file', type=str)
+args = parser.parse_args()
+if args.file is not None:
+    log_files = [args.file]
+
 for path_activitylog in log_files:
     print('reading ', path_activitylog)
     stats_filecontent = []
@@ -18,7 +25,7 @@ for path_activitylog in log_files:
         current_epoch = 0
         current_gymstat = None
         for line in activity_log:
-            time, level, message = line.split('::')
+            time, level, run_name, message = line.split('::')
             if 'Using config : ' in message:
                 stats_filecontent.append(message[16:].replace(',', ' '))
             elif 'Starting epoch ' in message:
